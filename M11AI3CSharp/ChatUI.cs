@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -32,12 +33,13 @@ public sealed class ChatUI : IDisposable
     private const int ChatBoxMargin = 10;
     private const int InputBoxHeight = 50;
     private const int SendButtonWidth = 80;
-    // private const int LineSpacing = 5;
+    private const int LineSpacing = 5;
     private const int MessagePadding = 10;
     private const int BubblePadding = 15;
     private const int IconSize = 32;
     private const int ScrollBarWidth = 10;
     private const int ScrollBarMinHeight = 20;
+    private const int MaxLineWidth = 500;
 
     public ChatUI(SpriteFont font, GraphicsDevice graphicsDevice)
     {
@@ -184,7 +186,6 @@ public sealed class ChatUI : IDisposable
             inputBoxRect.Height - 10
         );
 
-        // Handle send button click
         if (mouseState.LeftButton == ButtonState.Pressed && 
             _previousMouseState.LeftButton == ButtonState.Released && 
             sendButtonRect.Contains(mouseState.Position) && 
@@ -193,7 +194,6 @@ public sealed class ChatUI : IDisposable
             SendMessage();
         }
         
-        // Handle scrollbar interaction
         var chatBoxRect = new Rectangle(
             ChatBoxMargin,
             ChatBoxMargin,
@@ -206,33 +206,72 @@ public sealed class ChatUI : IDisposable
             _scrollBarRect.Contains(mouseState.Position) && 
             _maxScroll > 0)
         {
-            // Start dragging scrollbar
             _isDraggingScrollBar = true;
             _lastMouseDragPosition = new Vector2(mouseState.X, mouseState.Y);
         }
         else if (mouseState.LeftButton == ButtonState.Released)
         {
-            // Stop dragging scrollbar
             _isDraggingScrollBar = false;
         }
         else if (_isDraggingScrollBar)
         {
-            // Continue dragging scrollbar
             var deltaY = mouseState.Y - _lastMouseDragPosition.Y;
             _lastMouseDragPosition = new Vector2(mouseState.X, mouseState.Y);
             
-            // Calculate how much to scroll based on drag distance
             var scrollRatio = (float)(chatBoxRect.Height - 20 - _scrollBarRect.Height) / _maxScroll;
             _scrollOffset = MathHelper.Clamp(_scrollOffset + (int)(deltaY / scrollRatio), 0, _maxScroll);
         }
         
-        // Handle mouse wheel scrolling
         var mouseWheelDelta = mouseState.ScrollWheelValue - _previousMouseState.ScrollWheelValue;
         if (mouseWheelDelta != 0 && chatBoxRect.Contains(new Point(mouseState.X, mouseState.Y)))
         {
-            var scrollAmount = -Math.Sign(mouseWheelDelta) * 30; // Adjust sensitivity
+            var scrollAmount = -Math.Sign(mouseWheelDelta) * 30;
             _scrollOffset = MathHelper.Clamp(_scrollOffset + scrollAmount, 0, _maxScroll);
         }
+    }
+
+    private List<string> WrapText(string text, float maxWidth)
+    {
+        var words = text.Split(' ');
+        var lines = new List<string>();
+        var currentLine = new StringBuilder();
+        var currentLineWidth = 0f;
+
+        foreach (var word in words)
+        {
+            var wordWidth = _font.MeasureString(word).X;
+            var spaceWidth = currentLine.Length > 0 ? _font.MeasureString(" ").X : 0f;
+
+            if (currentLine.Length == 0)
+            {
+                currentLine.Append(word);
+                currentLineWidth = wordWidth;
+            }
+            else if (currentLineWidth + spaceWidth + wordWidth <= maxWidth)
+            {
+                currentLine.Append(" " + word);
+                currentLineWidth += spaceWidth + wordWidth;
+            }
+            else
+            {
+                lines.Add(currentLine.ToString());
+                currentLine.Clear();
+                currentLine.Append(word);
+                currentLineWidth = wordWidth;
+            }
+        }
+
+        if (currentLine.Length > 0)
+        {
+            lines.Add(currentLine.ToString());
+        }
+
+        if (lines.Count == 0)
+        {
+            lines.Add(text);
+        }
+
+        return lines;
     }
 
     private void SendMessage()
@@ -282,29 +321,34 @@ public sealed class ChatUI : IDisposable
 
     private void DrawChatBox(SpriteBatch spriteBatch, Rectangle rect)
     {
-        // Draw chat box background
         spriteBatch.Draw(_pixel, rect, Color.WhiteSmoke);
         spriteBatch.Draw(_pixel, new Rectangle(rect.X, rect.Y, rect.Width, 2), Color.Gray);
 
-        // Draw messages first (to avoid overlapping scrollbar thumb)
         var yPos = rect.Y + 10 - _scrollOffset;
         foreach (var message in _messages)
         {
-            var textSize = _font.MeasureString(message.Text);
-            var bubbleHeight = Math.Max(textSize.Y + BubblePadding * 2, IconSize + BubblePadding * 2);
-            var bubbleWidth = textSize.X + BubblePadding * 2 + IconSize + MessagePadding;
-            
-            // Determine message position (left for AI, right for user)
+            var wrappedLines = WrapText(message.Text, MaxLineWidth);
+            var maxLineWidth = 0f;
+            foreach (var line in wrappedLines)
+            {
+                var lineWidth = _font.MeasureString(line).X;
+                if (lineWidth > maxLineWidth)
+                {
+                    maxLineWidth = lineWidth;
+                }
+            }
+
+            var totalTextHeight = wrappedLines.Count * _font.LineSpacing + (wrappedLines.Count - 1) * LineSpacing;
+            var bubbleHeight = Math.Max(totalTextHeight + BubblePadding * 2, IconSize + BubblePadding * 2);
+            var bubbleWidth = maxLineWidth + BubblePadding * 2 + IconSize + MessagePadding;
+
             var isUserMessage = message.Sender == "User";
             var bubbleX = isUserMessage ? rect.Right - bubbleWidth - 20 : rect.X + 10;
-            
-            // Draw message bubble
-            var bubbleRect = new Rectangle(
-                (int)MathF.Round(bubbleX), yPos, (int)bubbleWidth, (int)bubbleHeight);
-            var bubbleColor = isUserMessage ? new Color(220, 248, 198) : new Color(230, 230, 250); // Light green for user, light purple for AI
+
+            var bubbleRect = new Rectangle((int)MathF.Round(bubbleX), yPos, (int)bubbleWidth, (int)bubbleHeight);
+            var bubbleColor = isUserMessage ? new Color(220, 248, 198) : new Color(230, 230, 250);
             spriteBatch.Draw(_pixel, bubbleRect, bubbleColor);
-            
-            // Draw sender icon
+
             var iconTexture = isUserMessage ? _userIcon : _aiIcon;
             if (iconTexture != null)
             {
@@ -316,50 +360,60 @@ public sealed class ChatUI : IDisposable
                 );
                 spriteBatch.Draw(iconTexture, iconRect, Color.White);
             }
-            
-            // Draw message text
-            var textPosition = new Vector2(
-                isUserMessage ? bubbleRect.Right - textSize.X - IconSize - MessagePadding : bubbleRect.X + IconSize + MessagePadding,
-                bubbleRect.Y + (bubbleHeight - textSize.Y) / 2
-            );
-            spriteBatch.DrawString(_font, message.Text, textPosition, Color.Black);
-            
+
+            var textStartY = bubbleRect.Y + (bubbleHeight - totalTextHeight) / 2;
+            for (int i = 0; i < wrappedLines.Count; i++)
+            {
+                var lineText = wrappedLines[i];
+                var textSize = _font.MeasureString(lineText);
+                var textPosition = new Vector2(
+                    isUserMessage ? bubbleRect.Right - textSize.X - IconSize - MessagePadding : bubbleRect.X + IconSize + MessagePadding,
+                    textStartY + i * (_font.LineSpacing + LineSpacing)
+                );
+                spriteBatch.DrawString(_font, lineText, textPosition, Color.Black);
+            }
+
             yPos += (int)bubbleHeight + MessagePadding;
         }
-        
-        // Calculate total height needed for all messages
+
         var totalMessagesHeight = 0f;
         foreach (var message in _messages)
         {
-            var textSize = _font.MeasureString(message.Text);
-            var bubbleHeight = Math.Max(textSize.Y + BubblePadding * 2, IconSize + BubblePadding * 2);
+            var wrappedLines = WrapText(message.Text, MaxLineWidth);
+            var maxLineWidth = 0f;
+            foreach (var line in wrappedLines)
+            {
+                var lineWidth = _font.MeasureString(line).X;
+                if (lineWidth > maxLineWidth)
+                {
+                    maxLineWidth = lineWidth;
+                }
+            }
+
+            var totalTextHeight = wrappedLines.Count * _font.LineSpacing + (wrappedLines.Count - 1) * LineSpacing;
+            var bubbleHeight = Math.Max(totalTextHeight + BubblePadding * 2, IconSize + BubblePadding * 2);
             totalMessagesHeight += bubbleHeight + MessagePadding;
         }
-        
-        // Update scroll max based on content
-        _maxScroll = Math.Max(0, (int)(totalMessagesHeight - rect.Height + 20)); // +20 for top margin
-        
-        // Calculate scrollbar dimensions
+
+        _maxScroll = Math.Max(0, (int)(totalMessagesHeight - rect.Height + 20));
+
         var scrollBarHeight = Math.Max(
-            ScrollBarMinHeight, 
+            ScrollBarMinHeight,
             (int)(rect.Height / Math.Max(totalMessagesHeight, rect.Height) * rect.Height)
         );
         var scrollBarY = rect.Y + 10 + (int)(
             _scrollOffset / (float)Math.Max(_maxScroll, 1) * (rect.Height - 10 - scrollBarHeight)
         );
-        
+
         _scrollBarRect = new Rectangle(
             rect.Right - ScrollBarWidth - 5,
             scrollBarY,
             ScrollBarWidth,
             scrollBarHeight
         );
-        
-        // Draw scrollbar background
+
         spriteBatch.Draw(_pixel, new Rectangle(_scrollBarRect.X - 2, rect.Y + 10, ScrollBarWidth + 4, rect.Height - 20), Color.LightGray);
-        
-        // Draw scrollbar thumb
-        spriteBatch.Draw(_pixel, _scrollBarRect, _isDraggingScrollBar ? Color.DarkGray : Color.Gray);    
+        spriteBatch.Draw(_pixel, _scrollBarRect, _isDraggingScrollBar ? Color.DarkGray : Color.Gray);
     }
 
     private void DrawInputBox(SpriteBatch spriteBatch, Rectangle inputRect, Rectangle sendButtonRect)

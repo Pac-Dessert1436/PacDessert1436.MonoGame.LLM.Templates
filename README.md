@@ -10,8 +10,8 @@ This template serves as a foundation for developing chatbot applications using t
 
 Note that the template is a **minimal viable product**, limited to English-only functionality and does not integrate with large language models (LLMs) such as DeepSeek or OpenAI.
 
-**Version**: 1.0.0  
-**Last Updated**: March 24 2026  
+**Version**: 1.0.1
+**Last Updated**: April 26 2026  
 **Template Names**: `m11ai3` (C#), `m11ai3-vb` (VB.NET)
 
 ### Key Features
@@ -23,6 +23,9 @@ Note that the template is a **minimal viable product**, limited to English-only 
 - **Keyboard-Driven Input**: Seamless text entry with Enter key submission
 - **Natural Interaction**: 1-second delayed auto-reply for realistic conversation flow
 - **MonoGame Framework**: Cross-platform compatibility with DesktopGL target
+- **Text Wrapping**: Automatic text wrapping for long messages with proper line spacing
+- **Enhanced Response Mappings**: Expanded keyword-response mappings for richer conversations
+- **Scrollbar Support**: Interactive scrollbar with mouse wheel and drag functionality
 
 ## 🚀 Quick Start
 
@@ -135,6 +138,8 @@ M11AI3VB/
 - **Input Handling**: Keyboard event processing and text input management
 - **Chat History**: Persistent message display with scrolling capability
 - **Visual Layout**: Clean, responsive UI design with proper spacing
+- **Text Wrapping**: Automatic line wrapping for long messages with configurable max width
+- **Scrollbar System**: Interactive scrollbar supporting mouse wheel and drag interactions
 
 ### GameMain (`GameMain.cs` / `GameMain.vb`)
 - **Game Lifecycle**: Initialization, update, and draw cycles
@@ -149,13 +154,13 @@ M11AI3VB/
 - **C# Version**: Add new keyword-response pairs in `ChatBotLogic.cs`
 ```csharp
 // Example: Add new keyword-response pairs in the fixed replies collection
-private readonly Dictionary<string, List<(string[] keys, string reply)>> FixedReplies
+private static readonly List<(string[] keys, string reply)> FixedReplies =
 [
     // ... Pre-defined responses in the template project ...
 
     // Add custom responses in this format:
-    (["hello", "hi", "hey"], "Hello there!"),
-    (["help"], "I can answer questions about...")
+    (new[] { "hello", "hi", "hey" }, "Hello there!"),
+    (new[] { "help" }, "I can answer questions about...")
 ];
 ```
 
@@ -171,12 +176,33 @@ Private ReadOnly FixedReplies As New List(Of (keys As String(), reply As String)
 }
 ```
 
+**Pre-defined Response Categories**:
+- **Greetings**: "hello", "hi", "hey", "how are you"
+- **Farewells**: "bye", "goodbye"
+- **Information**: "time", "weather", "version", "name", "creator"
+- **Help**: "help", "what can you do"
+- **Programming**: "csharp", "c#", "c sharp", "monogame", "programming", "code"
+- **AI Topics**: "ai", "artificial intelligence", "chatbot", "chat bot"
+- **Entertainment**: "joke", "tell me a joke"
+- **Project**: "monoeleven", "mono11"
+
 ### UI Customization
 
 - **Fonts**: Replace font files in `Content/Fonts/`
 - **Images**: Update UI assets in `Content/Images/`
 - **Colors**: Modify color schemes in the UI rendering code
 - **Layout**: Adjust positioning and sizing in `ChatUI` components
+
+**Text Wrapping Configuration**:
+- Max line width: 500 pixels (configurable via `MaxLineWidth` constant)
+- Line spacing: 5 pixels (configurable via `LineSpacing` constant)
+- Automatic word wrapping for messages exceeding max width
+
+**Scrollbar Configuration**:
+- Scrollbar width: 10 pixels (configurable via `ScrollBarWidth` constant)
+- Minimum scrollbar height: 20 pixels (configurable via `ScrollBarMinHeight` constant)
+- Mouse wheel sensitivity: 30 pixels per scroll event
+- Supports both mouse wheel and drag interactions
 
 ### Extending Functionality
 
